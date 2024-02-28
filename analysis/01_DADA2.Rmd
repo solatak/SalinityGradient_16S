@@ -13,6 +13,14 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.path = "../figures/01_DADA2/") # send any figure output to this folder
 ```
 
+# Before you start
+
+# Set my seed
+```{r set-seed}
+# Any number can be chosen
+set.seed(061898)
+```
+
 # Goals of this file
 
 1. Use raw fastq files and generate quality plots to assess quality of reads.
@@ -39,7 +47,7 @@ raw_fastqs_path <- "data/01_DADA2/01_raw_gzipped_fastqs"
 raw_fastqs_path
 
 # What files are in this path? Intuition Check
-list.files(raw_fastqs_path)
+head(list.files(raw_fastqs_path))
 
 # How many files are there?
 str(list.files(raw_fastqs_path))
@@ -71,6 +79,7 @@ head(reverse_reads)
 # Randomly select 2 samples from dataset to evaluate
 random_samples <- sample(1:length(reverse_reads), size=2)
 random_samples
+# do 12 for the project
 
 # Calculate and plot the quality of these two samples
 plotQualityProfile(forward_reads[random_samples])
@@ -101,8 +110,26 @@ head(filtered_reverse_reads)
 ```
 
 # Filter and trim Reads
+
+Parameters of filter and trim **DEPEND ON THE DATASET**
+(for your project you need to change the factors)
+This dataset doesn't have primers, but if you follow the two step Illumina protocol -> the 515F and 806R are included and need to be removed.
+
+- paired end is better than single read data
+- 'maxN' = number of N bases, remove all Ns from the data 
+- 'maxEE' = quality filtering threshold applied to expected errors, use 1 if possible. Here, if there's 2 expected errors, it's ok. But more than 2, throw away the sequence. Two values, first is for forward reads, second is for reverse. 
+- 'trimleft' = remove first three base pairs 
+- 'truncQ' = remove anything with quality score lower than
+
 ```{r filter-and-trim}
-?filterAndTrim
+# Assign a vector to filter reads
+# Trim out poor bases, first threee bps on F reads
+# Write out filtered fastq files
+filtered_reads <- 
+  filterAndTrim(fwd = forward_reads, filt = filtered_forward_reads,
+              rev = reverse_reads, filt.rev = filtered_reverse_reads,
+              maxN = 0, maxEE = c(2,2), trimLeft = 3,
+              truncQ = 2, rm.phix = TRUE, compress = TRUE) #multithread = TRUE
 
 
 ```
@@ -110,6 +137,10 @@ head(filtered_reverse_reads)
 
 
 
-
+# Session Information
+```{r session-info}
+# Ensure reproducibility
+devtools::session_info()
+```
 
 
