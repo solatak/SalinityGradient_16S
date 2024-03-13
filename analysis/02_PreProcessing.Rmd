@@ -128,6 +128,22 @@ head(metadata_track_reads_df)
 
 # Handoff to Phyloseq
 ```{r phyloseq-handoff}
+# Double check it's all good
+dim(asv_tab) # count table
+dim(tax_mat) # taxonomy matrix
+# rows match
 
+# Intuition Check
+stopifnot(row.names(asv_tab) == row.names(tax_mat))
+# no output = happy
+
+# Construct the phyloseq object
+raw_physeq <- phyloseq(otu_table(asv_tab, taxa_are_rows = TRUE), 
+                       sample_data(metadata_track_reads_df),
+                       tax_table(tax_mat))
+raw_physeq
+
+# Save this raw phyloseq object
+save(raw_physeq, file = "data/02_PreProcessing/raw_physeq.RData")
 ```
 
