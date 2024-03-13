@@ -1,0 +1,133 @@
+---
+title: "Phyloseq Preprocessing"
+author: "Sola Takahashi"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, 
+                      fig.align = "center",
+                      fig.path = "../figures/02_PreProcessing/") # send any figure output to this folder
+```
+
+
+# Load Libraries 
+```{r load-libraries}
+
+library(devtools)
+#devtools::install_github("joey711/phyloseq")
+library(phyloseq)
+library(tidyverse)
+
+```
+
+# Goals: 
+Here we will process the data into a phyloseq object.
+
+- ASV Table
+- Taxonomy Table
+- Track reads (metadata)
+
+Then, we will remove the following: 
+
+1. Remove Chloroplasts
+2. Remove Mitochondria
+3. Remove samples without enough reads
+
+Finally, write a data file of phyloseq output. 
+
+
+# Load Data 
+
+## ASV Table
+```{r load-asv-table}
+# first we will load asv table 
+load("data/01_DADA2/ASV_counts.RData")
+
+#Inspect ASV tab
+head(asv_tab)[,1:5]
+
+# Fix names
+sample_names <- colnames(asv_tab)
+samples_fixed <- sapply(strsplit(basename(sample_names), "_"), `[`,1) 
+head(samples_fixed)
+
+# Re-write the ASV count file to fix names 
+colnames(asv_tab) <- samples_fixed
+str(asv_tab)
+
+```
+
+
+## Taxonomy Table
+```{r load-tax-table}
+tax_df <- read.table("data/01_DADA2/ASV_taxonomy.tsv", sep = "\t", skip = 1)
+head(tax_df)
+
+# fix column names
+colnames(tax_df) <- c("asv_names", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "ASV", "ASVseq")
+head(tax_df)
+
+# Taxonomy Table Matrix
+tax_mat <-
+  tax_df %>% 
+  tibble::column_to_rownames(., var = "asv_names") %>% 
+  as.matrix()
+
+```
+
+
+## Track Reads Data
+```{r load-track-reads}
+load("data/01_DADA2/track_read_counts.RData")
+
+# take a look at the data
+head(track_counts_df)
+dim(track_counts_df)
+
+# Please in the terminal, copy the metadata.csv
+# Into SalinityGradient_16S/ data
+# from: /workdir/in_class_data/SalinityGradient_16S/
+# scp /workdir/in_class_data/SalinityGradient_16S/metadata.csv  /workdir/st974/git_repo/SalinityGradient_16S/data/
+
+# Load in the metadata
+metadata_df <- read.csv("data/metadata.csv")
+head (metadata_df)
+dim(metadata_df)
+# have 95 samples 
+head(track_counts_df)
+
+#check column names
+colnames(metadata_df)
+
+# Merge metadata_df with track_reads_df
+metadata_track_reads_df <- metadata_df %>%
+  left_join(., track_counts_df, by = "names") %>%
+  dplyr::select(-X)
+
+# Intuition check
+head(metadata_track_reads_df)
+
+# Update row.names to be sample names
+# Before
+row.names(metadata_track_reads_df)
+# Rewrite
+row.names(metadata_track_reads_df) <- metadata_track_reads_df$names
+# Check if it worked
+row.names(metadata_track_reads_df)
+
+# Intuition Check 
+head(metadata_track_reads_df)
+
+```
+
+
+# Handoff to Phyloseq
+```{r phyloseq-handoff}
+
+```
+
