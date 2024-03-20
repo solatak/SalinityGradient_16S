@@ -17,11 +17,7 @@ knitr::opts_chunk$set(echo = TRUE,
 
 # Load Libraries 
 ```{r load-libraries}
-
-library(devtools)
-#devtools::install_github("joey711/phyloseq")
-library(phyloseq)
-library(tidyverse)
+pacman::p_load(devtools, phyloseq, tidyverse, dada2, install = FALSE)
 
 ```
 
@@ -36,9 +32,11 @@ Then, we will remove the following:
 
 1. Remove Chloroplasts
 2. Remove Mitochondria
-3. Remove samples without enough reads
+3. Remove ASVs from negative controls and also negative control samples
+4. Evaluate accuracy by looking at the Mock Community
+5. Remove samples without enough reads
 
-Finally, write a data file of phyloseq output. 
+Finally, write a data file of phyloseq output, which will be stored in 'data/02_PreProcessing/raw-preprocessed-phyloseq.RData'
 
 
 # Load Data 
@@ -199,6 +197,8 @@ Take a look at the negative controls and then make a decision about whether or n
 2. ASVs found within the negative controls and their distribution in the samples.
 3. Evaluate the mock community
 
+
+
 ```{r neg-controls} 
 # Create a vector of samples that were negative controls
 control_samples <- c("WaterControl", "022um-Control", 
@@ -271,6 +271,169 @@ total_ASVs_rm
 
 
 ```
+
+# Evaluate Accuracy in the Mock Community
+
+- make a mock phyloseq object
+- load in the standard fasta sequences of the mock community
+- test for differences between the two
+
+```{r eval-accuracy-mock}
+# Make mock phyloseq object
+mock_physeq <- noControlsChloroMitos_physeq %>%
+  subset_samples(., names == "MockZymoPos") %>%
+  prune_taxa(taxa_sums(.) >0, .)
+
+# Inspect it
+mock_physeq
+
+tax_table(mock_physeq)
+
+# Write us a message summarizing this
+cat("DADA2 inferred", ntaxa(mock_physeq), "ASVs present in the mock community.")
+# Output: DADA2 inferred 8 ASVs present in the mock community.
+
+# Getting the mock community file
+# cp /workdir/in_class_data/SalinityGradient_16S/mock_amplicons.fasta  /workdir/st974/git_repo/SalinityGradient_16S/data/02_PreProcessing/
+
+####### Load in the mock reference sequence from Zymo 
+mock_ref <- getSequences("data/02_PreProcessing/mock_amplicons.fasta")
+names(mock_ref)
+
+### Pull out seqs from Seqnenced Mock Community 
+mock_seqs <- 
+  mock_physeq %>%
+    tax_table() %>%
+    data.frame() %>%
+    dplyr::select(ASV, ASVseq)
+
+# Inspect
+head(mock_seqs)
+
+# Which ASVs match the reference?
+match_asvs <- 
+  mock_seqs %>%
+  rowwise() %>%
+  # check each ASV if they match, TRUE, if not = FALSE
+  mutate(Match = any(grepl(ASVseq, mock_ref))) %>%
+  # create a vector of names that matched
+  pull(ASV)
+
+# Evaluate which ones do NOT match??
+# What's their abundances?
+# This helps provide error rate
+
+
+cat(length(match_asvs), "ASVs were exact matches to the expected reference sequence")
+# mock community has a few sequences because the ASVs in match_asvs are in the 100s
+
+# How many sequences were in the mock?
+mock_seqDepth <- 
+mock_physeq %>%
+  otu_table() %>%
+  data.frame() %>%
+  colSums()
+# Output: 3878
+
+# Who is in the sequenced mock community?
+mock_physeq %>%
+  tax_table() %>%
+  data.frame() %>%
+  dplyr::select(Genus, Species)
+
+# Curious: what are the mock counts in the actual samples?
+noControlsChloroMitos_physeq %>%
+  subset_taxa(., ASV %in% match_asvs) %>%
+  otu_table() %>%
+  t()
+
+```
+
+What can you conclude about the mock community???
+A: 8/8 match perfectly 
+A: all 8 ASVs in the mock exactly match 8 of 9 in the reference file
+
+## Remove mock community and it's ASVs
+```{r rm-mmock-asvs}
+# Make a new phyloseq object without mock and its asvs
+noControlsMock_ChloroMitos_physeq <- 
+noControlsChloroMitos_physeq %>%
+  # remove mock community 
+  subset_samples(., names != "MockZymoPos") %>%
+  # remove ASVs from the mock
+  subset_taxa(., !(ASV %in% match_asvs))
+
+noControlsMock_ChloroMitos_physeq
+
+# Intuition Check
+ntaxa(noControlsChloroMitos_physeq) - ntaxa(noControlsMock_ChloroMitos_physeq)
+
+```
+
+
+# Evaluate the Sequencing Depth
+```{r seq-depth}
+# the current data object
+noControlsMock_ChloroMitos_physeq
+
+# What is the library size/sequencing depth for each sample ?
+seqSums_df <-
+  noControlsMock_ChloroMitos_physeq %>%
+  otu_table() %>%
+  # Sum each sample column_to_rownames
+  colSums() %>%
+  data.frame() %>%
+  rownames_to_column(var = "names") %>%
+  left_join(., metadata_track_reads_df, by = "names")
+  # removes the samples that don't match in metadata_track_reads_df
+
+# Check
+dim(seqSums_df)
+head(seqSums_df)
+
+# show the depth of samples
+#seqSums_df %>%
+ # dplyr::select(names, TotalSeqs)%>%
+  #arrange(TotalSeqs) 
+
+# Rename second column
+colnames(seqSums_df)[2] <- "TotalSeqs"
+
+# Plot it!
+seqSums_df %>%
+  ggplot(aes(x=reorder(names, TotalSeqs), y = TotalSeqs, fill = station)) +
+  geom_bar(stat = "identity") 
+
+# Density plot
+seqSums_df %>%
+  ggplot(aes(TotalSeqs, fill = station)) +
+  geom_density(alpha = 0.5)
+
+```
+
+# Remove samples with few reads
+```{r rem-samps}
+# what's the min seq depth?
+min(sample_sums(noControlsMock_ChloroMitos_physeq))
+
+# remove 20210615-MA-SCB2F 
+raw_preprocessed_physeq <-
+  noControlsMock_ChloroMitos_physeq %>%
+  subset_samples(., names != "20210615-MA-SCB2F")
+
+# What's the new min seq depth?
+min(sample_sums(raw_preprocessed_physeq))
+
+```
+
+# Save Preprocessed Phyloseq Object
+```{r save physeq}
+save(raw_preprocessed_physeq,
+     file = "data/02_PreProcessing/raw_preprocessed_physeq.RData")
+
+```
+
+
 
 # Session Information
 ```{r session-info}
