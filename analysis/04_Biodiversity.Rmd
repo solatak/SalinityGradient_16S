@@ -36,6 +36,14 @@ raw_preprocessed_physeq
 min(sample_sums(raw_preprocessed_physeq))
 # output: 1836
 
+# Make a metadata dataframe
+metadata_df <- 
+  raw_preprocessed_physeq %>%
+  sample_data() %>%
+  data.frame() 
+
+#head(metadata_df)
+
 # Setting colors for the stations
 station_colors <- c(
   "Shipping Channel" = "dodgerblue4",
@@ -82,10 +90,13 @@ dim(iNEXT_input_df)
 load("data/04_Biodiversity/iNEXT_data.RData")
 str(iNEXT_data)
 typeof(iNEXT_data)
+# size based estimator is the best for incidence data
+# this type of list is less stringent data standards (S3), don't need anchoring of sample/column names (S4 - with phyloseq object)
 
 ```
 
 
+# Plot Diversity
 ```{r plot-rarefaction}
 # Prepare colors
 color_df <-
@@ -95,13 +106,52 @@ color_df <-
   
 # Check
 head(color_df)
+
 # Rename column
 colnames(color_df)[1] <- "names"
+
+# Make a helper dataframe for plotting with colors
+# replace . and remove X
+iNEXT_color_df <-
+color_df %>%
+  # fix the names for merging
+  mutate(names = gsub(names, pattern = "[.]", replace = "-"), 
+         names = gsub(names, pattern = "X", replace = "")) %>%
+  # merge iwth metadata
+  left_join(metadata_df, by = "names") %>%
+  # merge with colors for plotting with ggNEXT
+  left_join(data.frame(station_colors = station_colors,
+            station = names(station_colors)),
+            by = "station")
+  
 
 # END HERE
 
 ```
 
+# Plot Rarefaction with 'ggiNEXT'
+```{r ggiNEXT, fig.width = 8, fig.height= 3.5}
+# Plot rarefaction
+# rarefaction v extrapolation curve, type = 1
+
+# Order q: 
+# 0 = RIchness/ total number taxa
+# 1 = Exponential Shannon/ Number of common taxa
+# 2 = Inverse simpson / Number of dominant taxa 
+
+ggiNEXT(iNEXT_data, type = 1, facet.var = "Order.q") +
+  facet_wrap(~Order.q, scales = "fixed") +
+  scale_color_manual(values = iNEXT_color_df$station_colors, guide = FALSE) +
+  scale_fill_manual(values = iNEXT_color_df$station_colors, guide = FALSE) +
+  scale_shape_manual(values = base::rep(17, nsamples(raw_preprocessed_physeq)), 
+                     guide = FALSE) +
+  theme(legend.position = "none")
+# ggplot shapes, 17= triangle
+# Analysis:
+# in soils and water -> microbial seed bank of a bunch of dormant species 
+# 
+
+```
 
 
 
