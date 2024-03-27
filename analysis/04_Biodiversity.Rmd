@@ -192,4 +192,46 @@ iNEXT_manual_df %>%
 ```
 
 
+# Environmental Variable Check
+```{r environmental-pairs, fig.width= 8, fig.height=8}
+#head(metadata_df)
+
+# Pull out environmental variables
+env_df <-
+  metadata_df %>%
+  dplyr::select(names, water_tempC:DO_mgL)
+# Inspect
+# head(env_df)
+
+# Plot the correlations
+pairs(dplyr::select(env_df, -names), upper.panel = NULL)
+```
+
+
+# Diversity vs Salinity
+```{r div-vs-salinity, fig.height=3.5, fig.width=6}
+# PSU = practical salinity unit 
+# 1 PSU = 1g of salt per 1000 g of water
+# 1 PSU = 1 ppt (parts per thousand)
+# Freshwater = 0 - 0.5
+# Brackish = 0.5 - 30
+# Marine = >30
+
+iNEXT_manual_df %>%
+  dplyr::filter(Method == "Observed") %>%
+  ggplot(aes(x = salinity_psu, y = qD)) +
+  facet_wrap(.~ Order.q, scales = "free") +
+  geom_point(aes(color = station)) +
+  stat_smooth(method = "lm", formula = y ~poly(x, 2)) + 
+  labs(x = "Salinity (PSU)", y = "# of ASVs") +
+  scale_color_manual(values = station_colors) +
+  theme(legend.position = "bottom")
+# more dominant taxa in freshwater and marine water than brackish water 
+```
+
+# Session Information
+```{r session-info}
+devtools::session_info()
+```
+
 
