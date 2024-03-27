@@ -9,7 +9,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE,
-                      fig.path = "../figures/04_Biodiversity")
+                      fig.path = "../figures/04_Biodiversity/")
 ```
 
 # Setting the Environment
@@ -125,11 +125,11 @@ color_df %>%
             by = "station")
   
 
-# END HERE
 
 ```
 
 # Plot Rarefaction with 'ggiNEXT'
+
 ```{r ggiNEXT, fig.width = 8, fig.height= 3.5}
 # Plot rarefaction
 # rarefaction v extrapolation curve, type = 1
@@ -149,10 +149,47 @@ ggiNEXT(iNEXT_data, type = 1, facet.var = "Order.q") +
 # ggplot shapes, 17= triangle
 # Analysis:
 # in soils and water -> microbial seed bank of a bunch of dormant species 
-# 
+# want to see our data plateaus so that we know we've sequenced everything
+# Simpson and Shannon plateaus earlier because less sensitive because fewer numbers of ASVs that are abundant/common, so more likely to sample them earlier on in the sampling. Richness is very sensitive.
 
 ```
 
+# Manually plot Diversity
+
+## Rarefaction
+```{r iNEXT-manual}
+
+iNEXT_manual_df <- 
+  iNEXT_data$iNextEst$size_based %>%
+  dplyr::rename(names = Assemblage) %>%
+  # fix sample names
+  mutate(names = gsub(names, pattern = "[.]", replace = "-"),
+         names = gsub(names, pattern = "X", replace = "")) %>%
+  #head()
+  # join with meta data
+  left_join(., metadata_df, by = "names") %>%
+  # Add colors to data frame
+  left_join(., data.frame(station_colors = station_colors,
+                          station = names(station_colors)),
+            by = "station") 
+# Inspect
+dim(iNEXT_manual_df)
+str(iNEXT_manual_df)
+
+# Plot it - Rarefaction curve
+iNEXT_manual_df %>%
+  # Filter out rows that are calculated by rarefaction from iNEXT
+  dplyr::filter(Method == "Rarefaction") %>%
+  # Make the actual plot
+  ggplot(aes( x= m, y = qD, color = station, group = names)) +
+  geom_line() +
+  #geom_point() +
+  # facet with the station
+  facet_grid(Order.q~ station, scales = "fixed") + 
+  scale_color_manual(values = station_colors) +
+  theme(legend.position = "bottom")
+
+```
 
 
 
