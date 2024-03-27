@@ -1,0 +1,16 @@
+---
+title: "Phylogenetic Tree Construction"
+author: "Sola Takahashi"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Load Pacakges
+```{r load-environment}
+# phytools, ggtree, RColorBrewer
+pacman::p_load(phytools, ggtree, RColorBrewer, install = TRUE)
+
+```
+
